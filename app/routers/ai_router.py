@@ -1,4 +1,4 @@
-# app/routers/ai_router.py
+# mcp-edamam/app/routers/ai_router.py
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -14,7 +14,57 @@ class AIQuery(BaseModel):
     intent: str
     parameters: dict
 
-@router.post("/query")
+@router.post(
+    "/query",
+    summary="Execute an AI/MCP intent",
+    description=(
+        "Main unified endpoint for the MCP. Accepts an intent and a set of parameters.\n\n"
+        "**Supported intents:**\n"
+        "- `get_food_nutrition`: Nutrition by food name or foodId\n"
+        "- `analyze_food_image`: Nutrition from image URL\n"
+        "- Auto-redirect: if a text query is detected to be an image, the MCP will redirect automatically\n\n"
+        "**Returns:**\n"
+        "- Fully structured nutrition results\n"
+        "- Image-based vision analysis (ingredients + nutrition)\n"
+    ),
+    responses={
+        200: {
+            "description": "Successful MCP response",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "text_query": {
+                            "summary": "Nutrition for 100g banana",
+                            "value": {
+                                "food": "Banana",
+                                "quantity": 100,
+                                "nutrients": {
+                                    "ENERC_KCAL": {"label": "Energy", "quantity": 89, "unit": "kcal"},
+                                    "PROCNT": {"label": "Protein", "quantity": 1.1, "unit": "g"}
+                                }
+                            }
+                        },
+                        "image_query": {
+                            "summary": "Nutrition from food image",
+                            "value": {
+                                "analysis_type": "image",
+                                "source": "https://example.com/food.jpg",
+                                "food": "Chicken Salad",
+                                "ingredients_list": "Chicken, lettuce, mayo",
+                                "serving_weight_grams": 210,
+                                "nutrients": {},
+                                "recipe": {}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        400: {"description": "Invalid intent or missing parameters"},
+        404: {"description": "Food not found"},
+        500: {"description": "Internal MCP error"}
+    }
+)
 async def ai_query(payload: AIQuery):
     mcp_logger.info(f"[LLM→MCP] Intent: {payload.intent}, Parameters: {payload.parameters}")
     logging.info(f"AI request: {payload.dict()}")
@@ -26,7 +76,6 @@ async def ai_query(payload: AIQuery):
             query = payload.parameters.get("query")
             quantity = payload.parameters.get("quantity", 100)
 
-            # Auto-redirect if the query is an image URL
             if isinstance(query, str) and any(ext in query.lower() for ext in [".jpg", ".jpeg", ".png", ".webp"]):
                 mcp_logger.info("[MCP] Auto-redirected text query to get_nutrition_from_image")
                 return await ai_query(AIQuery(intent="analyze_food_image", parameters={"image_url": query}))
@@ -43,14 +92,12 @@ async def ai_query(payload: AIQuery):
             }
 
         elif payload.intent == "analyze_food_image":
-            # Accept 'image' or 'image_url'
             image = payload.parameters.get("image") or payload.parameters.get("image_url")
             if not image:
                 raise HTTPException(status_code=400, detail="Missing 'image' or 'image_url' parameter")
 
             vision_data = await get_nutrition_from_image(image)
 
-            # Parse data from vision response
             parsed = vision_data.get("parsed", {})
             recipe = vision_data.get("recipe", {})
             food_label = parsed.get("food", {}).get("label")
@@ -58,7 +105,7 @@ async def ai_query(payload: AIQuery):
             measure = parsed.get("measure", {})
             quantity = parsed.get("quantity", 1)
             weight_per_unit = measure.get("weight", 1)
-            
+
             result = {
                 "analysis_type": "image",
                 "source": image,
@@ -72,7 +119,6 @@ async def ai_query(payload: AIQuery):
         else:
             raise HTTPException(status_code=400, detail=f"Unknown intent: {payload.intent}")
 
-        # Log result and return
         mcp_logger.info(f"[MCP→LLM] Response: {str(result)[:500]}")
         return result
 

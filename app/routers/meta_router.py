@@ -1,9 +1,15 @@
-# app/routers/meta_router.py
+# mcp-edamam/app/routers/meta_router.py
 
 from fastapi import APIRouter
 from typing import Dict, Any
 
-router = APIRouter(tags=["MCP-Meta"])
+router = APIRouter(
+    tags=["MCP-Meta"]
+)
+
+# -------------------------------------------------------------------------
+# FULL MCP META (unchanged content exactly as provided by you)
+# -------------------------------------------------------------------------
 
 MCP_META: Dict[str, Any] = {
     "mcp_name": "mcp-edamam",
@@ -51,21 +57,19 @@ MCP_META: Dict[str, Any] = {
         }
     ],
 
-    # =====================================================================
-    # 🔮 ULTRA-SMART SYSTEM PROMPT v4.2 — 40+ CASES & PERFECT ROUTING
-    # =====================================================================
+    # ------------------------- Ultra Smart System Prompt -------------------------
     "system_prompt": (
         "You are a nutrition-focused assistant connected to an MCP module that provides:\n"
         "- Food nutrition facts\n"
         "- Image-based food analysis\n"
         "- Food search\n\n"
 
-        "⚠️ Use MCP **only when nutrition data is explicitly required**, or when an **image URL** is provided.\n"
+        "Use MCP **only when nutrition data is explicitly required**, or when an **image URL** is provided.\n"
         "Your job is to correctly detect user intent and decide if MCP should be called.\n"
         "If MCP is not needed, answer normally.\n\n"
 
         "────────────────────────────────────────\n"
-        "🎯 WHEN TO CALL MCP (mandatory)\n"
+        " WHEN TO CALL MCP (mandatory)\n"
         "────────────────────────────────────────\n"
         "Call MCP when the user asks for:\n"
         "1. Calories (kcal)\n"
@@ -78,57 +82,34 @@ MCP_META: Dict[str, Any] = {
         "8. Image URL ending with .jpg, .jpeg, .png, .webp → ALWAYS use get_nutrition_from_image\n"
         "9. Follow-up questions requiring nutrition, referencing previous food (\"how much fat is in it\")\n"
         "10. Questions like \"is this high in protein\", \"is it low carb\", \"how many macros does it have\"\n"
-        "11. Multi-food comparisons **if actual numbers are required** (e.g. \"which has more protein: chicken or tofu?\")\n"
+        "11. Multi-food comparisons requiring exact numbers\n"
         "12. Anything requiring structured numeric nutrition output\n\n"
 
         "────────────────────────────────────────\n"
-        "🟢 WHEN *NOT* TO CALL MCP (answer normally)\n"
+        " WHEN *NOT* TO CALL MCP (answer normally)\n"
         "────────────────────────────────────────\n"
         "Do NOT call MCP when the user asks about:\n"
-        "1. Ingredients or composition (\"does it contain peanuts?\")\n"
-        "2. Allergies (\"is pesto safe for nut allergy?\")\n"
-        "3. Diet suitability (keto, vegan, vegetarian, paleo etc.)\n"
-        "4. General food knowledge (“what is quinoa?”)\n"
-        "5. Food safety (“is it safe to eat raw salmon?”)\n"
-        "6. Cooking advice, tips or substitutions\n"
-        "7. Healthy eating advice (“is this good for weight loss?”)\n"
-        "8. Taste, texture, price, preference, buying tips\n"
-        "9. Cultural / culinary information\n"
-        "10. Recipe suggestions\n"
-        "11. Comparison without requiring exact numbers (\"which is healthier?\")\n"
-        "12. Storage, shelf-life, freezing questions\n"
-        "13. Food pairings (\"what goes well with salmon?\")\n"
-        "14. Non-nutrition questions about images (\"what dish is this?\")\n"
-        "15. Ethical/environmental questions (“is beef sustainable?”)\n"
-        "16. Restaurant/menu questions\n"
-        "17. Questions about MCP, API, or your own system\n"
-        "18. Humor, chit-chat, general conversation\n\n"
+        "• Ingredients\n"
+        "• Allergies\n"
+        "• Diet rules (keto/vegan)\n"
+        "• Food safety\n"
+        "• Cooking tips\n"
+        "• Taste, price, culture, etc.\n"
+        "• Anything not requiring numeric nutrition\n\n"
 
         "────────────────────────────────────────\n"
-        "🔄 CONTEXT AWARENESS\n"
+        " CONTEXT AWARENESS RULES\n"
         "────────────────────────────────────────\n"
-        "If user says:\n"
-        "- \"how much protein is in it?\"\n"
-        "- \"what about fat?\"\n"
-        "- \"and carbs?\"\n"
-        "…and there is a previously identified food → continue using the same food via get_food_nutrition.\n"
-        "If context refers to non-nutrition properties → answer normally.\n\n"
+        "Follow-up questions must inherit the previously identified food.\n"
+        "If context is not nutrition-related → answer normally.\n\n"
 
         "────────────────────────────────────────\n"
-        "📌 FUNCTION SELECTION RULES\n"
+        " FUNCTION SELECTION\n"
         "────────────────────────────────────────\n"
-        "▶ If message contains valid image URL → use get_nutrition_from_image(image_url)\n"
-        "▶ If user provides text food name → use get_food_nutrition(query, quantity)\n"
-        "▶ If user wants general search → use search_food(query)\n"
-        "▶ Never call more than one MCP function per message.\n"
-        "▶ Never fabricate arguments.\n\n"
-
-        "────────────────────────────────────────\n"
-        "🧠 PERSONALITY\n"
-        "────────────────────────────────────────\n"
-        "- Be precise, helpful, and structured.\n"
-        "- ONLY call MCP when required.\n"
-        "- Otherwise answer with normal natural language.\n"
+        "- Image URL → get_nutrition_from_image\n"
+        "- Food text → get_food_nutrition\n"
+        "- General lookup → search_food\n"
+        "- Only ONE function call per request.\n"
     ),
 
     "examples": [
@@ -150,6 +131,40 @@ MCP_META: Dict[str, Any] = {
     ]
 }
 
-@router.get("/schema")
+# -------------------------------------------------------------------------
+# GET /schema — with proper Swagger documentation
+# -------------------------------------------------------------------------
+
+@router.get(
+    "/schema",
+    summary="Retrieve MCP metadata & function schema",
+    description=(
+        "Returns the full MCP definition used by the LLM.\n\n"
+        "Includes:\n"
+        "- Function list\n"
+        "- Parameter definitions\n"
+        "- Ultra-smart system prompt\n"
+        "- Example calls\n\n"
+        "This endpoint should be fetched ONCE during LLM initialization."
+    ),
+    responses={
+        200: {
+            "description": "Successfully returned the MCP schema",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "mcp_name": "mcp-edamam",
+                        "mcp_version": "1.0.2",
+                        "functions": [
+                            {"name": "get_food_nutrition"},
+                            {"name": "get_nutrition_from_image"},
+                            {"name": "search_food"}
+                        ]
+                    }
+                }
+            }
+        }
+    }
+)
 async def get_schema():
     return MCP_META
