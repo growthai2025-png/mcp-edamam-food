@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import logging
+from typing import Optional
 from app.services.edamam_service import search_food, get_food_nutrition, get_nutrition_from_image
 from app.utils.logger import mcp_logger
 
@@ -10,9 +11,29 @@ router = APIRouter(
     tags=["AI"]
 )
 
+# ======================================================
+# PARAMETER SCHEMAS (Swagger needs this to show UPC)
+# ======================================================
+
+class FoodNutritionParams(BaseModel):
+    query: Optional[str] = None   # Food name, UPC, EAN, PLU or text
+    foodId: Optional[str] = None  # Optional Edamam ID
+    quantity: Optional[float] = 100
+
+
+class ImageAnalysisParams(BaseModel):
+    image: Optional[str] = None
+    image_url: Optional[str] = None
+
+
 class AIQuery(BaseModel):
     intent: str
-    parameters: dict
+    parameters: dict  # dynamic, but Swagger will pull schema via examples
+
+
+# ======================================================
+# ROUTER
+# ======================================================
 
 @router.post(
     "/query",
@@ -20,9 +41,14 @@ class AIQuery(BaseModel):
     description=(
         "Main unified endpoint for the MCP. Accepts an intent and a set of parameters.\n\n"
         "**Supported intents:**\n"
-        "- `get_food_nutrition`: Nutrition by food name or foodId\n"
+        "- `get_food_nutrition`: Nutrition by food name, foodId, UPC/EAN/PLU\n"
         "- `analyze_food_image`: Nutrition from image URL\n"
-        "- Auto-redirect: if a text query is detected to be an image, the MCP will redirect automatically\n\n"
+        "- Auto-redirect: if a text query looks like an image URL → auto-switch to analyze_food_image\n\n"
+        "**Parameters for get_food_nutrition:**\n"
+        "- `query`: Food name, UPC, EAN, PLU (MUST be provided unless foodId is used)\n"
+        "- `quantity`: grams (default: 100)\n\n"
+        "**Parameters for analyze_food_image:**\n"
+        "- `image_url`: Direct URL of an image\n\n"
         "**Returns:**\n"
         "- Fully structured nutrition results\n"
         "- Image-based vision analysis (ingredients + nutrition)\n"
@@ -33,27 +59,33 @@ class AIQuery(BaseModel):
             "content": {
                 "application/json": {
                     "examples": {
-                        "text_query": {
-                            "summary": "Nutrition for 100g banana",
+                        "upc_query": {
+                            "summary": "Search by UPC barcode",
                             "value": {
-                                "food": "Banana",
-                                "quantity": 100,
-                                "nutrients": {
-                                    "ENERC_KCAL": {"label": "Energy", "quantity": 89, "unit": "kcal"},
-                                    "PROCNT": {"label": "Protein", "quantity": 1.1, "unit": "g"}
+                                "intent": "get_food_nutrition",
+                                "parameters": {
+                                    "query": "0745178450003",
+                                    "quantity": 100
+                                }
+                            }
+                        },
+                        "name_query": {
+                            "summary": "Search by food name",
+                            "value": {
+                                "intent": "get_food_nutrition",
+                                "parameters": {
+                                    "query": "banana",
+                                    "quantity": 100
                                 }
                             }
                         },
                         "image_query": {
-                            "summary": "Nutrition from food image",
+                            "summary": "Image-based nutrition",
                             "value": {
-                                "analysis_type": "image",
-                                "source": "https://example.com/food.jpg",
-                                "food": "Chicken Salad",
-                                "ingredients_list": "Chicken, lettuce, mayo",
-                                "serving_weight_grams": 210,
-                                "nutrients": {},
-                                "recipe": {}
+                                "intent": "analyze_food_image",
+                                "parameters": {
+                                    "image_url": "https://example.com/food.jpg"
+                                }
                             }
                         }
                     }
@@ -72,14 +104,19 @@ async def ai_query(payload: AIQuery):
     try:
         result = None
 
+        # ======================================================
+        # get_food_nutrition
+        # ======================================================
         if payload.intent == "get_food_nutrition":
             query = payload.parameters.get("query")
             quantity = payload.parameters.get("quantity", 100)
 
+            # Image URL auto-redirect
             if isinstance(query, str) and any(ext in query.lower() for ext in [".jpg", ".jpeg", ".png", ".webp"]):
-                mcp_logger.info("[MCP] Auto-redirected text query to get_nutrition_from_image")
+                mcp_logger.info("[MCP] Auto-redirect text query → analyze_food_image")
                 return await ai_query(AIQuery(intent="analyze_food_image", parameters={"image_url": query}))
 
+            # UPC / EAN / PLU / normal text: handled inside search_food()
             food = await search_food(query)
             if not food:
                 raise HTTPException(status_code=404, detail="Food not found")
@@ -91,6 +128,9 @@ async def ai_query(payload: AIQuery):
                 "nutrients": nutrition.get("totalNutrients", {})
             }
 
+        # ======================================================
+        # analyze_food_image
+        # ======================================================
         elif payload.intent == "analyze_food_image":
             image = payload.parameters.get("image") or payload.parameters.get("image_url")
             if not image:
@@ -116,6 +156,37 @@ async def ai_query(payload: AIQuery):
                 "recipe": recipe,
             }
 
+        # ======================================================
+        # search_food
+        # ======================================================
+        elif payload.intent == "search_food":
+            query = payload.parameters.get("query")
+            limit = payload.parameters.get("limit", 5)
+
+            if not query:
+                raise HTTPException(status_code=400, detail="Missing 'query' parameter")
+
+            # Perform Edamam search (supports UPC / text)
+            results = await search_food(query)
+
+            if not results:
+                raise HTTPException(status_code=404, detail="No results found")
+
+            # Normalize single dict → list of results
+            # because search_food() returns only the top match today
+            normalized = [results] if isinstance(results, dict) else results
+
+            # Limit results if needed
+            normalized = normalized[:limit]
+
+            result = {
+                "query": query,
+                "results": normalized
+            }
+
+        # ======================================================
+        # Unknown
+        # ======================================================
         else:
             raise HTTPException(status_code=400, detail=f"Unknown intent: {payload.intent}")
 
