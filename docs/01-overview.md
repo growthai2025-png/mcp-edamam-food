@@ -1,17 +1,21 @@
 # Overview
 
-`edamam-mcp` is a small FastAPI service that wraps the **Edamam Food Database API**
-and exposes an LLM‑friendly interface via two main endpoints:
+`edamam-mcp` is a FastAPI-based service that wraps the **Edamam Food Database API**
+and exposes a **dual-transport, LLM-friendly interface**:
 
-- `GET /v1/mcp/schema` – a metadata endpoint that returns:
-  - a ready‑to‑use system prompt, and
-  - an array of function definitions (`functions`) compatible with OpenAI Chat Completions.
-- `POST /v1/ai/query` – a unified execution endpoint that takes an `intent` and `parameters`.
+- ✅ REST (classic HTTP)
+- ✅ JSON-RPC (MCP / tool-based execution)
 
-The goal is to make it trivial for an LLM to:
+The core endpoints are:
 
-- look up nutrition for foods by text (`get_food_nutrition`),
+- `GET /v1/mcp/schema` – metadata endpoint for LLM discovery
+- `POST /v1/ai/query` – unified REST execution endpoint
+- `POST /v1/rpc` – JSON-RPC / MCP transport
+
+The goal is to allow an LLM or agent to:
+
+- look up nutrition for foods (`get_food_nutrition`),
 - search for candidate foods (`search_food`),
-- analyze food images (`analyze_food_image`),
+- analyze food images (`get_nutrition_from_image`),
 
-without exposing the full complexity of Edamam’s REST API.
+without exposing the full complexity of Edamam’s native REST API.

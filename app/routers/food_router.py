@@ -1,4 +1,5 @@
-# app/routers/food_router.py
+# mcp-edamam/app/routers/food_router.py
+
 from fastapi import APIRouter, Query, HTTPException
 from pydantic import BaseModel
 from app.services.edamam_service import search_food, get_nutrition_from_image

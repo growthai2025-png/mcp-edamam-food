@@ -28,7 +28,36 @@ class ImageAnalysisParams(BaseModel):
 
 class AIQuery(BaseModel):
     intent: str
-    parameters: dict  # dynamic, but Swagger will pull schema via examples
+
+    parameters: dict
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "intent": "get_food_nutrition",
+                    "parameters": {
+                        "query": "banana",
+                        "quantity": 100
+                    }
+                },
+                {
+                    "intent": "search_food",
+                    "parameters": {
+                        "query": "almonds",
+                        "limit": 5
+                    }
+                },
+                {
+                    "intent": "analyze_food_image",
+                    "parameters": {
+                        "image_url": "https://example.com/food.jpg"
+                    }
+                }
+            ]
+        }
+    }
+
 
 
 # ======================================================
@@ -43,6 +72,7 @@ class AIQuery(BaseModel):
         "**Supported intents:**\n"
         "- `get_food_nutrition`: Nutrition by food name, foodId, UPC/EAN/PLU\n"
         "- `analyze_food_image`: Nutrition from image URL\n"
+        "- `search_food: food lookup without nutrition\n"
         "- Auto-redirect: if a text query looks like an image URL → auto-switch to analyze_food_image\n\n"
         "**Parameters for get_food_nutrition:**\n"
         "- `query`: Food name, UPC, EAN, PLU (MUST be provided unless foodId is used)\n"
@@ -79,6 +109,16 @@ class AIQuery(BaseModel):
                                 }
                             }
                         },
+                        "search_food": {
+                            "summary": "Search for foods",
+                            "value": {
+                                "intent": "search_food",
+                                "parameters": {
+                                    "query": "almonds",
+                                    "limit": 5
+                                }
+                            }
+                        },
                         "image_query": {
                             "summary": "Image-based nutrition",
                             "value": {
@@ -99,7 +139,7 @@ class AIQuery(BaseModel):
 )
 async def ai_query(payload: AIQuery):
     mcp_logger.info(f"[LLM→MCP] Intent: {payload.intent}, Parameters: {payload.parameters}")
-    logging.info(f"AI request: {payload.dict()}")
+    mcp_logger.info(f"AI request: {payload.dict()}")
 
     try:
         result = None

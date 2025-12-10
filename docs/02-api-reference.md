@@ -1,8 +1,8 @@
 # API Reference
 
-## `GET /v1/mcp/schema`
+## GET /v1/mcp/schema
 
-Returns MCP metadata for LLM integration:
+Returns MCP metadata for LLM integration.
 
 ```json
 {
@@ -13,11 +13,13 @@ Returns MCP metadata for LLM integration:
   "system_prompt": "You are connected to a Modular Connector ...",
   "examples": [ ... ]
 }
-```
+````
 
-## `POST /v1/ai/query`
+---
 
-Main execution endpoint.
+## POST /v1/ai/query (REST)
+
+Main unified execution endpoint.
 
 ### Request body
 
@@ -30,6 +32,45 @@ Main execution endpoint.
 }
 ```
 
-### Intents
+---
 
-See the root `README.md` for detailed schema examples of each intent.
+## POST /v1/rpc (JSON-RPC / MCP)
+
+Tool-based execution endpoint.
+
+### tools/list
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/list",
+  "id": 1
+}
+```
+
+### tools/call
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "search_food",
+    "arguments": {
+      "query": "banana",
+      "limit": 5
+    }
+  },
+  "id": 1
+}
+```
+
+---
+
+## Supported Intents / Tools
+
+* `get_food_nutrition`
+* `search_food`
+* `get_nutrition_from_image`
+
+Detailed schemas are defined in `/v1/mcp/schema`.

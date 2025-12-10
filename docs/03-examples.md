@@ -1,8 +1,11 @@
 # Examples
 
-## Example 1 – Get nutrition for 50g almonds
+This section shows real-world usage examples for both
+**REST** and **JSON-RPC (MCP)** transports.
 
-**Request**
+---
+
+## Example 1 – Get nutrition for 50g almonds (REST)
 
 ```http
 POST /v1/ai/query
@@ -15,9 +18,9 @@ Content-Type: application/json
     "quantity": 50
   }
 }
-```
+````
 
-**Response (simplified)**
+Response (simplified):
 
 ```json
 {
@@ -30,9 +33,14 @@ Content-Type: application/json
 }
 ```
 
-## Example 2 – Analyze a food image
+---
 
-```json
+## Example 2 – Analyze a food image (REST)
+
+```http
+POST /v1/ai/query
+Content-Type: application/json
+
 {
   "intent": "analyze_food_image",
   "parameters": {
@@ -41,4 +49,43 @@ Content-Type: application/json
 }
 ```
 
-Response (simplified) contains detected food label, ingredients list, serving weight and nutrients.
+---
+
+## Example 3 – Search food (JSON-RPC)
+
+```http
+POST /v1/rpc
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "search_food",
+    "arguments": {
+      "query": "banana",
+      "limit": 5
+    }
+  },
+  "id": 1
+}
+```
+
+---
+
+## Example 4 – Get nutrition (JSON-RPC)
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "get_food_nutrition",
+    "arguments": {
+      "query": "banana",
+      "quantity": 100
+    }
+  },
+  "id": 2
+}
+```
