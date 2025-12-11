@@ -14,8 +14,7 @@ from app.routers.meta_router import MCP_META
 from app.utils.logger import mcp_logger
 
 router = APIRouter(
-    tags=["MCP-JSONRPC"],
-    description="Low-level JSON-RPC 2.0 endpoint for MCP tools"
+    tags=["MCP-JSONRPC"]
 )
 
 logger = logging.getLogger("mcp_jsonrpc")
